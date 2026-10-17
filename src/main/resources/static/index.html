@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LeRobot Workbench</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;600;700&family=Syne:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/css/app.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">LeRobot <span>Workbench</span></div>
+          <div class="brand-sub">可视化机器人学习流水线</div>
+        </div>
+        <nav class="nav">
+          <button data-route="home" class="active">总览</button>
+          <button data-route="hardware">硬件准备</button>
+          <button data-route="record">数据采集</button>
+          <button data-route="datasets">数据集</button>
+          <button data-route="train">训练</button>
+          <button data-route="eval">评估 / 部署</button>
+          <button data-route="align">数据对齐 <span class="tag">soon</span></button>
+          <button data-route="annotate">智能标注 <span class="tag">soon</span></button>
+          <button data-route="pipeline">流水线</button>
+        </nav>
+        <div class="sidebar-foot">
+          <span id="ros-dot" class="dot"></span>
+          <span id="ros-label">ROS 检测中…</span>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1 id="page-title">工作台总览</h1>
+            <p id="page-desc">用界面完成 LeRobot 全流程，底层统一走 ROS 通讯。</p>
+          </div>
+        </header>
+
+        <!-- HOME -->
+        <section class="view active" data-view="home">
+          <div class="hero">
+            <h2>把实验室命令行，收进一块控制台</h2>
+            <p>
+              标定、录制、训练、评估与后续的数据对齐 / 自动标注，都将通过点击完成。
+              Java 服务作为编排层，ROS 作为统一总线，对接本仓库 Python 能力。
+            </p>
+            <div class="hero-actions">
+              <button class="btn" data-goto="#/hardware">开始硬件准备</button>
+              <button class="btn secondary" data-goto="#/pipeline">查看流水线</button>
+            </div>
+            <div class="stat-row">
+              <div class="stat"><b id="stat-repo">—</b><span>代码库链接</span></div>
+              <div class="stat"><b id="stat-transport">—</b><span>ROS 传输</span></div>
+              <div class="stat"><b id="stat-modules">—</b><span>功能模块</span></div>
+            </div>
+          </div>
+          <div class="grid cols-3" id="module-grid"></div>
+        </section>
+
+        <!-- HARDWARE -->
+        <section class="view" data-view="hardware">
+          <div class="grid cols-2">
+            <article class="panel">
+              <h3>查找串口</h3>
+              <p class="desc">对应 <code>lerobot-find-port</code>，通过 ROS 服务触发。</p>
+              <div class="actions">
+                <button class="btn" id="btn-find-ports">扫描端口</button>
+              </div>
+              <pre class="log" id="ports-out" style="height:140px">等待扫描…</pre>
+            </article>
+            <article class="panel">
+              <h3>标定</h3>
+              <p class="desc">对应 <code>lerobot-calibrate</code>。</p>
+              <form id="form-calibrate" class="form-grid">
+                <div class="field">
+                  <label>角色</label>
+                  <select name="role">
+                    <option value="robot">从臂 Robot</option>
+                    <option value="teleop">主臂 Teleop</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>类型</label>
+                  <select name="type">
+                    <option value="so101_follower">so101_follower</option>
+                    <option value="so101_leader">so101_leader</option>
+                    <option value="so100_follower">so100_follower</option>
+                    <option value="so100_leader">so100_leader</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>端口</label>
+                  <input name="port" placeholder="/dev/tty.usbmodem…" required />
+                </div>
+                <div class="field">
+                  <label>设备 ID</label>
+                  <input name="id" value="my_arm" required />
+                </div>
+                <div class="actions" style="grid-column:1/-1">
+                  <button class="btn" type="submit">开始标定</button>
+                </div>
+              </form>
+            </article>
+            <article class="panel" style="grid-column:1/-1">
+              <h3>遥操作试跑</h3>
+              <p class="desc">对应 <code>lerobot-teleoperate</code>，不写数据集。</p>
+              <form id="form-teleop" class="form-grid">
+                <div class="field">
+                  <label>Robot 类型</label>
+                  <input name="robotType" value="so101_follower" />
+                </div>
+                <div class="field">
+                  <label>Robot 端口</label>
+                  <input name="robotPort" placeholder="/dev/tty…" />
+                </div>
+                <div class="field">
+                  <label>Teleop 类型</label>
+                  <input name="teleopType" value="so101_leader" />
+                </div>
+                <div class="field">
+                  <label>Teleop 端口</label>
+                  <input name="teleopPort" placeholder="/dev/tty…" />
+                </div>
+              </form>
+              <div class="actions">
+                <button class="btn" id="btn-teleop-start" type="button">启动遥操作</button>
+                <button class="btn danger" id="btn-teleop-stop" type="button">停止</button>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- RECORD -->
+        <section class="view" data-view="record">
+          <article class="panel">
+            <h3>录制配置</h3>
+            <p class="desc">对应 <code>lerobot-record</code>。表单参数经 ROS 发给 Python 桥接节点。</p>
+            <form id="form-record" class="form-grid">
+              <div class="field">
+                <label>数据集 repo_id</label>
+                <input name="repoId" value="local/my_pick_task" required />
+              </div>
+              <div class="field">
+                <label>任务描述</label>
+                <input name="singleTask" value="Pick the cube" required />
+              </div>
+              <div class="field">
+                <label>回合数</label>
+                <input name="numEpisodes" type="number" value="10" min="1" />
+              </div>
+              <div class="field">
+                <label>FPS</label>
+                <input name="fps" type="number" value="30" min="1" />
+              </div>
+              <div class="field">
+                <label>Robot 类型</label>
+                <input name="robotType" value="so101_follower" />
+              </div>
+              <div class="field">
+                <label>Teleop 类型</label>
+                <input name="teleopType" value="so101_leader" />
+              </div>
+              <div class="field">
+                <label>Robot 端口</label>
+                <input name="robotPort" placeholder="/dev/tty…" />
+              </div>
+              <div class="field">
+                <label>Teleop 端口</label>
+                <input name="teleopPort" placeholder="/dev/tty…" />
+              </div>
+              <div class="field full">
+                <label>相机 JSON（可选）</label>
+                <textarea name="cameras" rows="3" placeholder='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30}}'></textarea>
+              </div>
+              <div class="actions" style="grid-column:1/-1">
+                <button class="btn" type="submit">开始录制</button>
+                <button class="btn danger" id="btn-record-stop" type="button">停止录制</button>
+              </div>
+            </form>
+          </article>
+        </section>
+
+        <!-- DATASETS -->
+        <section class="view" data-view="datasets">
+          <article class="panel">
+            <h3>数据集列表</h3>
+            <p class="desc">通过 ROS 服务查询可用数据集。</p>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>repo_id</th>
+                  <th>episodes</th>
+                  <th>fps</th>
+                  <th>frames</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="dataset-tbody"></tbody>
+            </table>
+          </article>
+        </section>
+
+        <!-- TRAIN -->
+        <section class="view" data-view="train">
+          <article class="panel">
+            <h3>训练任务</h3>
+            <p class="desc">对应 <code>lerobot-train</code>。</p>
+            <form id="form-train" class="form-grid">
+              <div class="field">
+                <label>策略</label>
+                <select name="policyType">
+                  <option value="act">ACT</option>
+                  <option value="diffusion">Diffusion</option>
+                  <option value="smolvla">SmolVLA</option>
+                  <option value="pi0">π0</option>
+                  <option value="pi05">π0.5</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>数据集 repo_id</label>
+                <input name="datasetRepoId" value="local/my_pick_task" required />
+              </div>
+              <div class="field">
+                <label>训练步数</label>
+                <input name="steps" type="number" value="100000" />
+              </div>
+              <div class="field">
+                <label>批次大小</label>
+                <input name="batchSize" type="number" value="8" />
+              </div>
+              <div class="field">
+                <label>输出目录</label>
+                <input name="outputDir" value="outputs/train/act_demo" />
+              </div>
+              <div class="field">
+                <label>设备</label>
+                <select name="device">
+                  <option value="cuda">cuda</option>
+                  <option value="mps">mps</option>
+                  <option value="cpu">cpu</option>
+                </select>
+              </div>
+              <div class="actions" style="grid-column:1/-1">
+                <button class="btn" type="submit">启动训练</button>
+                <button class="btn danger" id="btn-train-stop" type="button">停止</button>
+              </div>
+            </form>
+          </article>
+        </section>
+
+        <!-- EVAL -->
+        <section class="view" data-view="eval">
+          <article class="panel">
+            <h3>评估 / Rollout</h3>
+            <p class="desc">仿真用 <code>lerobot-eval</code>，真机用 <code>lerobot-rollout</code>。</p>
+            <form id="form-eval" class="form-grid">
+              <div class="field">
+                <label>模式</label>
+                <select name="mode">
+                  <option value="eval">仿真评估</option>
+                  <option value="rollout">真机 Rollout</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>策略路径 / Hub id</label>
+                <input name="policyPath" value="outputs/train/act_demo/checkpoints/last/pretrained_model" />
+              </div>
+              <div class="field">
+                <label>环境类型</label>
+                <input name="envType" value="pusht" />
+              </div>
+              <div class="field">
+                <label>回合数</label>
+                <input name="nEpisodes" type="number" value="10" />
+              </div>
+              <div class="actions" style="grid-column:1/-1">
+                <button class="btn" type="submit">启动</button>
+              </div>
+            </form>
+          </article>
+        </section>
+
+        <!-- ALIGN -->
+        <section class="view" data-view="align">
+          <article class="panel">
+            <h3>数据对齐整理</h3>
+            <p class="desc">规划能力：多相机 / 本体感觉时间对齐、丢帧修补、特征校验。接口已预留 ROS 服务。</p>
+            <form id="form-align" class="form-grid">
+              <div class="field">
+                <label>数据集</label>
+                <input name="repoId" value="local/my_pick_task" />
+              </div>
+              <div class="field">
+                <label>容差 (秒)</label>
+                <input name="toleranceS" type="number" step="0.0001" value="0.0001" />
+              </div>
+              <div class="field full">
+                <label>策略</label>
+                <select name="strategy">
+                  <option value="timestamp">按时间戳对齐</option>
+                  <option value="nearest">最近邻插值</option>
+                  <option value="drop">丢弃不对齐帧</option>
+                </select>
+              </div>
+              <div class="actions" style="grid-column:1/-1">
+                <button class="btn" type="submit">运行对齐</button>
+              </div>
+            </form>
+          </article>
+        </section>
+
+        <!-- ANNOTATE -->
+        <section class="view" data-view="annotate">
+          <article class="panel">
+            <h3>智能标注</h3>
+            <p class="desc">规划能力：自动任务切分、关键帧检测、语言标注建议。对接未来视觉/语言模型。</p>
+            <form id="form-annotate" class="form-grid">
+              <div class="field">
+                <label>数据集</label>
+                <input name="repoId" value="local/my_pick_task" />
+              </div>
+              <div class="field">
+                <label>模型</label>
+                <select name="model">
+                  <option value="keyframe">关键帧检测</option>
+                  <option value="caption">语言描述</option>
+                  <option value="success">成功/失败判定</option>
+                </select>
+              </div>
+              <div class="actions" style="grid-column:1/-1">
+                <button class="btn" type="submit">开始标注</button>
+              </div>
+            </form>
+          </article>
+        </section>
+
+        <!-- PIPELINE -->
+        <section class="view" data-view="pipeline">
+          <article class="panel">
+            <h3>端到端流水线</h3>
+            <p class="desc">标准实验室路径。每一步都可在左侧导航打开对应界面。</p>
+            <div class="pipeline-flow">
+              <div class="pipeline-node"><strong>硬件</strong><span>端口 · 标定</span></div>
+              <div class="pipeline-arrow">→</div>
+              <div class="pipeline-node"><strong>录制</strong><span>遥操作采集</span></div>
+              <div class="pipeline-arrow">→</div>
+              <div class="pipeline-node"><strong>对齐</strong><span>整理校验</span></div>
+              <div class="pipeline-arrow">→</div>
+              <div class="pipeline-node"><strong>标注</strong><span>自动识别</span></div>
+              <div class="pipeline-arrow">→</div>
+              <div class="pipeline-node"><strong>训练</strong><span>策略优化</span></div>
+              <div class="pipeline-arrow">→</div>
+              <div class="pipeline-node"><strong>评估</strong><span>仿真 / 真机</span></div>
+            </div>
+          </article>
+        </section>
+
+        <!-- shared live panel -->
+        <article class="panel" style="margin-top: 18px">
+          <h3>任务进度与日志</h3>
+          <p class="desc">经 STOMP 订阅 ROS 总线转发的 <code>/topic/jobs</code> 与 <code>/topic/logs</code>。</p>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="badge">progress</span>
+            <strong id="job-progress-label">0%</strong>
+          </div>
+          <div class="progress"><span id="job-progress"></span></div>
+          <div class="log" id="live-log"></div>
+        </article>
+      </main>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/ws.js"></script>
+    <script src="/js/app.js"></script>
+  </body>
+</html>
