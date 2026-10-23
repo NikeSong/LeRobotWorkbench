@@ -14,7 +14,6 @@ import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -23,10 +22,8 @@ import com.lerobot.workbench.config.WorkbenchProperties;
 
 /**
  * ROS transport via rosbridge_suite WebSocket protocol.
- * Start rosbridge on the robot/host machine, then set {@code lerobot.ros.mock=false}.
  */
 @Component
-@ConditionalOnProperty(prefix = "lerobot.ros", name = "mock", havingValue = "false")
 public class RosbridgeMessageBus implements RosMessageBus {
 
     private static final Logger log = LoggerFactory.getLogger(RosbridgeMessageBus.class);
@@ -203,13 +200,25 @@ public class RosbridgeMessageBus implements RosMessageBus {
                 String id = String.valueOf(frame.get("id"));
                 CompletableFuture<Map<String, Object>> fut = pendingServices.remove(id);
                 if (fut != null) {
+                    boolean result = !Boolean.FALSE.equals(frame.get("result"));
                     Object values = frame.get("values");
                     if (values instanceof Map<?, ?> m) {
                         fut.complete((Map<String, Object>) m);
                     } else if (values instanceof String s) {
-                        fut.complete(mapper.readValue(s, new TypeReference<>() {}));
+                        String trimmed = s.trim();
+                        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+                            try {
+                                fut.complete(mapper.readValue(trimmed, new TypeReference<>() {}));
+                            } catch (Exception parseErr) {
+                                fut.complete(Map.of("ok", false, "error", trimmed));
+                            }
+                        } else {
+                            fut.complete(Map.of("ok", result, "error", trimmed));
+                        }
                     } else {
-                        fut.complete(Map.of("ok", frame.getOrDefault("result", true), "values", values));
+                        fut.complete(Map.of(
+                                "ok", result,
+                                "values", values == null ? "" : values));
                     }
                 }
             }

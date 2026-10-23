@@ -1,0 +1,12 @@
+# One-click ROS for LeRobot Workbench: rosbridge on ws://127.0.0.1:9090
+# Arm USB nodes run on the host and publish to this bridge.
+services:
+  rosbridge:
+    build: .
+    image: lerobot-workbench-rosbridge:humble
+    container_name: lerobot-rosbridge
+    ports:
+      - "9090:9090"
+    environment:
+      ROS_DOMAIN_ID: "0"
+    restart: unless-stopped

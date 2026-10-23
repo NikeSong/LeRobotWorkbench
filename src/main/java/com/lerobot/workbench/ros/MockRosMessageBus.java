@@ -13,15 +13,12 @@ import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * In-process ROS bus for developing the UI without a live ROS graph.
- * Service calls are answered with realistic stub payloads so the pipeline can be clicked through.
+ * In-process fallback bus used only when real ROS is unavailable.
  */
 @Component
-@ConditionalOnProperty(prefix = "lerobot.ros", name = "mock", havingValue = "true", matchIfMissing = true)
 public class MockRosMessageBus implements RosMessageBus {
 
     private static final Logger log = LoggerFactory.getLogger(MockRosMessageBus.class);
@@ -47,7 +44,7 @@ public class MockRosMessageBus implements RosMessageBus {
     @Override
     public void connect() {
         connected = true;
-        log.info("Mock ROS bus connected (no rosbridge required)");
+        log.info("Mock ROS bus connected (fallback only)");
         publish(RosTopics.STATUS, Map.of(
                 "state", "ready",
                 "transport", "mock",
@@ -79,13 +76,11 @@ public class MockRosMessageBus implements RosMessageBus {
         return switch (service) {
             case RosTopics.HW_FIND_PORT -> Map.of(
                     "ok", true,
-                    "ports", List.of(
-                            Map.of("path", "/dev/tty.usbmodem_FOLLOWER", "hint", "follower"),
-                            Map.of("path", "/dev/tty.usbmodem_LEADER", "hint", "leader")));
+                    "ports", List.of());
             case RosTopics.HW_CALIBRATE -> Map.of(
                     "ok", true,
                     "jobId", UUID.randomUUID().toString(),
-                    "message", "Calibration started (mock)");
+                    "message", "Calibration started (mock — 请先部署真实 ROS)");
             case RosTopics.HW_TELEOP -> Map.of(
                     "ok", true,
                     "running", Boolean.TRUE.equals(request.get("start")),
@@ -96,16 +91,12 @@ public class MockRosMessageBus implements RosMessageBus {
             case RosTopics.TRAIN_STOP -> Map.of("ok", true, "message", "Training stopped (mock)");
             case RosTopics.EVAL_START -> startMockJob("eval", request);
             case RosTopics.ROLLOUT_START -> startMockJob("rollout", request);
-            case RosTopics.DATASET_LIST -> Map.of(
-                    "ok", true,
-                    "datasets", List.of(
-                            Map.of("repoId", "local/demo_pick_cube", "episodes", 12, "fps", 30, "frames", 4800),
-                            Map.of("repoId", "lerobot/aloha_mobile_cabinet", "episodes", 50, "fps", 50, "frames", 25000)));
+            case RosTopics.DATASET_LIST -> Map.of("ok", true, "datasets", List.of());
             case RosTopics.DATASET_INFO -> Map.of(
                     "ok", true,
                     "repoId", request.getOrDefault("repoId", "local/demo"),
                     "fps", 30,
-                    "features", List.of("observation.state", "observation.images.front", "action"),
+                    "features", List.of("observation.state", "action"),
                     "codebaseVersion", "v3.0");
             case RosTopics.ALIGN_RUN -> startMockJob("align", request);
             case RosTopics.ANNOTATE_RUN -> startMockJob("annotate", request);
@@ -126,9 +117,9 @@ public class MockRosMessageBus implements RosMessageBus {
     }
 
     private void simulateProgress(String kind, String jobId) {
-        for (int i = 0; i <= 100; i += 10) {
+        for (int i = 0; i <= 100; i += 20) {
             try {
-                Thread.sleep(400);
+                Thread.sleep(250);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
@@ -141,11 +132,6 @@ public class MockRosMessageBus implements RosMessageBus {
             msg.put("message", kind + " " + i + "%");
             msg.put("ts", Instant.now().toString());
             publish(RosTopics.JOB_PROGRESS, msg);
-            publish(RosTopics.LOG, Map.of(
-                    "level", "INFO",
-                    "source", kind,
-                    "message", "[" + jobId.substring(0, 8) + "] " + kind + " progress " + i + "%",
-                    "ts", Instant.now().toString()));
         }
     }
 }

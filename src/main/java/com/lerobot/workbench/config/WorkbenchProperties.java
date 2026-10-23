@@ -40,10 +40,16 @@ public class WorkbenchProperties {
 
     public static class Ros {
         private boolean enabled = true;
-        private boolean mock = true;
+        /** Force mock even when native/docker ROS is available. */
+        private boolean mock = false;
         private String rosbridgeUrl = "ws://127.0.0.1:9090";
         private long reconnectMs = 3000;
         private String namespace = "/lerobot";
+        /**
+         * Pixi + RoboStack project that already has ROS 2 (e.g. ~/work/dev/ros-learn).
+         * Docker is only a fallback when this is absent.
+         */
+        private String nativePixiProject = System.getProperty("user.home") + "/work/dev/ros-learn";
 
         public boolean isEnabled() {
             return enabled;
@@ -83,6 +89,14 @@ public class WorkbenchProperties {
 
         public void setNamespace(String namespace) {
             this.namespace = namespace;
+        }
+
+        public String getNativePixiProject() {
+            return nativePixiProject;
+        }
+
+        public void setNativePixiProject(String nativePixiProject) {
+            this.nativePixiProject = nativePixiProject;
         }
     }
 }

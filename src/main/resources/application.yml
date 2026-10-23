@@ -13,16 +13,17 @@ lerobot:
   repo-root: ${LEROBOT_REPO_ROOT:..}
   # Default dataset / model home (HF cache style)
   data-home: ${LEROBOT_HOME:${user.home}/.cache/huggingface/lerobot}
-  # Python executable used by the local bridge process
-  python-bin: ${LEROBOT_PYTHON:uv}
-  # When true, run without a live ROS master (in-process mock bus)
+  # uv absolute path (IDE 启动时常没有 ~/.local/bin)。可用 LEROBOT_PYTHON 覆盖
+  python-bin: ${LEROBOT_PYTHON:/Users/nixon/.local/bin/uv}
+  # mock=true 强制离线演示；默认 false，启动时自动探测 rosbridge
+  # Docker 不是必须：优先使用本机 Pixi/RoboStack（native-pixi-project）
   ros:
     enabled: true
-    mock: ${LEROBOT_ROS_MOCK:true}
+    mock: ${LEROBOT_ROS_MOCK:false}
     rosbridge-url: ${ROSBRIDGE_URL:ws://127.0.0.1:9090}
     reconnect-ms: 3000
-    # Topic / service namespace used by the Python bridge nodes
     namespace: /lerobot
+    native-pixi-project: ${LEROBOT_ROS_PIXI:${user.home}/work/dev/ros-learn}
 
 logging:
   level:

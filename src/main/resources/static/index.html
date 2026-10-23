@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;600;700&family=Syne:wght@600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/css/app.css" />
+    <link rel="stylesheet" href="/css/app.css?v=21" />
   </head>
   <body>
     <div class="app">
@@ -21,14 +21,9 @@
         </div>
         <nav class="nav">
           <button data-route="home" class="active">总览</button>
-          <button data-route="hardware">硬件准备</button>
           <button data-route="record">数据采集</button>
           <button data-route="datasets">数据集</button>
-          <button data-route="train">训练</button>
-          <button data-route="eval">评估 / 部署</button>
-          <button data-route="align">数据对齐 <span class="tag">soon</span></button>
-          <button data-route="annotate">智能标注 <span class="tag">soon</span></button>
-          <button data-route="pipeline">流水线</button>
+          <button data-route="settings">设置</button>
         </nav>
         <div class="sidebar-foot">
           <span id="ros-dot" class="dot"></span>
@@ -40,21 +35,28 @@
         <header class="topbar">
           <div>
             <h1 id="page-title">工作台总览</h1>
-            <p id="page-desc">用界面完成 LeRobot 全流程，底层统一走 ROS 通讯。</p>
+            <p id="page-desc">标定和相机定好之后收在设置里。平时只填任务、录数据。</p>
           </div>
         </header>
 
         <!-- HOME -->
         <section class="view active" data-view="home">
+          <div id="ros-home-banner" class="ros-banner" hidden>
+            <div>
+              <strong id="ros-banner-title">ROS 未就绪</strong>
+              <div id="ros-banner-desc" style="color:var(--muted);margin-top:4px"></div>
+            </div>
+            <button class="btn" type="button" data-goto="#/settings">去设置</button>
+          </div>
           <div class="hero">
-            <h2>把实验室命令行，收进一块控制台</h2>
+            <h2>先把设备和保存位置定好，然后只录数据</h2>
             <p>
-              标定、录制、训练、评估与后续的数据对齐 / 自动标注，都将通过点击完成。
-              Java 服务作为编排层，ROS 作为统一总线，对接本仓库 Python 能力。
+              配对、标定、摄像头、帧率和保存目录放在设置里，同一套硬件不用每次再填。
+              训练、评估、对齐和标注目前没有接到真实程序，主流程里不提供这些按钮。
             </p>
             <div class="hero-actions">
-              <button class="btn" data-goto="#/hardware">开始硬件准备</button>
-              <button class="btn secondary" data-goto="#/pipeline">查看流水线</button>
+              <button class="btn" data-goto="#/record">去采集</button>
+              <button class="btn secondary" data-goto="#/settings">设置</button>
             </div>
             <div class="stat-row">
               <div class="stat"><b id="stat-repo">—</b><span>代码库链接</span></div>
@@ -65,126 +67,326 @@
           <div class="grid cols-3" id="module-grid"></div>
         </section>
 
-        <!-- HARDWARE -->
-        <section class="view" data-view="hardware">
+        <!-- SETTINGS: one-time hardware, cameras, ROS, record defaults -->
+        <section class="view" data-view="settings">
+          <article class="panel">
+            <h3>已经定好的配置</h3>
+            <p class="desc">这些东西对同一套硬件、同一段时间不会变。采集页不再放这些输入框。要改机械臂、相机、帧率或保存位置，就在这一页改。</p>
+            <div id="settings-summary" class="role-chip empty">正在读取当前配置…</div>
+          </article>
+          <article class="panel" style="margin-top:16px">
+            <h3>采集默认值</h3>
+            <form id="form-defaults" class="form-grid">
+              <div class="field">
+                <label>从臂型号</label>
+                <select name="robotType" id="pref-robot-type">
+                  <option value="so101_follower">SO-101 从臂</option>
+                  <option value="so100_follower">SO-100 从臂</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>主臂型号</label>
+                <select name="teleopType" id="pref-teleop-type">
+                  <option value="so101_leader">SO-101 主臂</option>
+                  <option value="so100_leader">SO-100 主臂</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>FPS</label>
+                <input name="fps" id="pref-fps" type="number" value="30" min="1" max="60" />
+              </div>
+              <div class="field">
+                <label>保存位置</label>
+                <div class="path-row">
+                  <input id="record-save-path" readonly />
+                  <button class="btn secondary" id="btn-pick-folder" type="button">选择</button>
+                </div>
+                <p class="desc" id="record-folder-hint">最后一级文件夹会跟着任务描述变化。</p>
+              </div>
+            </form>
+          </article>
+          <article class="panel" style="margin-top:16px">
+            <h3>还没接到程序的功能</h3>
+            <p class="desc">训练、仿真评估、真机 rollout、数据对齐、智能标注在界面上曾经能点，但底层不会真正执行。现在直接拒绝，避免把「已完成」写进进度。</p>
+          </article>
+        </section>
+
+        <!-- ROS -->
+        <section class="view" data-view="ros">
+          <div id="ros-status-banner" class="ros-banner">
+            <div>
+              <strong id="ros-mode-title">检测中…</strong>
+              <div id="ros-mode-desc" style="color:var(--muted);margin-top:4px">正在检查本机 ROS / Docker / rosbridge</div>
+            </div>
+            <div class="actions" style="margin:0">
+              <button class="btn secondary" id="btn-ros-detect" type="button">重新检测</button>
+              <button class="btn" id="btn-ros-deploy" type="button">一键部署 ROS</button>
+            </div>
+          </div>
+
           <div class="grid cols-2">
             <article class="panel">
-              <h3>查找串口</h3>
-              <p class="desc">对应 <code>lerobot-find-port</code>，通过 ROS 服务触发。</p>
+              <h3>环境检查</h3>
+              <p class="desc">优先用你本机已有的 ROS（Pixi/RoboStack）。Docker <strong>不是必须</strong>，只在没有本机 ROS 时作为备选。</p>
+              <ul class="check-list" id="ros-checklist"></ul>
               <div class="actions">
-                <button class="btn" id="btn-find-ports">扫描端口</button>
+                <button class="btn" id="btn-ros-connect" type="button">连接真实 ROS</button>
+                <button class="btn ghost" id="btn-ros-mock" type="button">仅演示（Mock）</button>
+                <button class="btn danger" id="btn-ros-stop" type="button" hidden>停止 rosbridge</button>
               </div>
-              <pre class="log" id="ports-out" style="height:140px">等待扫描…</pre>
+              <pre class="log" id="ros-deploy-log" style="height:160px">部署日志会显示在这里。</pre>
             </article>
+
             <article class="panel">
-              <h3>标定</h3>
-              <p class="desc">对应 <code>lerobot-calibrate</code>。</p>
-              <form id="form-calibrate" class="form-grid">
-                <div class="field">
-                  <label>角色</label>
-                  <select name="role">
-                    <option value="robot">从臂 Robot</option>
-                    <option value="teleop">主臂 Teleop</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label>类型</label>
-                  <select name="type">
-                    <option value="so101_follower">so101_follower</option>
-                    <option value="so101_leader">so101_leader</option>
-                    <option value="so100_follower">so100_follower</option>
-                    <option value="so100_leader">so100_leader</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label>端口</label>
-                  <input name="port" placeholder="/dev/tty.usbmodem…" required />
-                </div>
-                <div class="field">
-                  <label>设备 ID</label>
-                  <input name="id" value="my_arm" required />
-                </div>
-                <div class="actions" style="grid-column:1/-1">
-                  <button class="btn" type="submit">开始标定</button>
-                </div>
-              </form>
-            </article>
-            <article class="panel" style="grid-column:1/-1">
-              <h3>遥操作试跑</h3>
-              <p class="desc">对应 <code>lerobot-teleoperate</code>，不写数据集。</p>
-              <form id="form-teleop" class="form-grid">
-                <div class="field">
-                  <label>Robot 类型</label>
-                  <input name="robotType" value="so101_follower" />
-                </div>
-                <div class="field">
-                  <label>Robot 端口</label>
-                  <input name="robotPort" placeholder="/dev/tty…" />
-                </div>
-                <div class="field">
-                  <label>Teleop 类型</label>
-                  <input name="teleopType" value="so101_leader" />
-                </div>
-                <div class="field">
-                  <label>Teleop 端口</label>
-                  <input name="teleopPort" placeholder="/dev/tty…" />
-                </div>
-              </form>
+              <h3>通讯节点</h3>
+              <p class="desc">只显示 ROS 图里的通讯相关节点（如 rosbridge）。机械臂、摄像头、训练不在本页管理。</p>
               <div class="actions">
-                <button class="btn" id="btn-teleop-start" type="button">启动遥操作</button>
-                <button class="btn danger" id="btn-teleop-stop" type="button">停止</button>
+                <button class="btn secondary" id="btn-ros-nodes-refresh" type="button">刷新节点</button>
               </div>
+              <table class="table" style="margin-top:10px">
+                <thead>
+                  <tr>
+                    <th>节点</th>
+                    <th>类型</th>
+                    <th>状态</th>
+                    <th>详情</th>
+                  </tr>
+                </thead>
+                <tbody id="ros-node-tbody">
+                  <tr><td colspan="4">尚未加载</td></tr>
+                </tbody>
+              </table>
             </article>
           </div>
         </section>
 
+        <!-- HARDWARE -->
+        <section class="view" data-view="hardware">
+          <article class="panel">
+            <h3>配对主臂 / 从臂</h3>
+            <p class="desc">不用看尾号。按向导：先拔从臂 → 再插回 → 再拔主臂 → 再插回，系统自动记住哪条是哪条。</p>
+            <div class="actions">
+              <button class="btn" id="btn-pair-start" type="button">开始配对向导</button>
+              <button class="btn secondary" id="btn-pair-again" type="button" hidden>重新配对</button>
+              <button class="btn ghost" id="btn-find-ports" type="button">刷新设备列表</button>
+            </div>
+            <div id="identify-wizard" class="wizard" hidden>
+              <div class="wizard-steps" id="wizard-steps"></div>
+              <p id="identify-hint" class="wizard-hint"></p>
+              <div class="actions" id="wizard-actions"></div>
+            </div>
+            <div id="port-list" class="port-list" style="margin-top:14px"></div>
+          </article>
+
+          <div class="grid cols-2" style="margin-top:16px">
+            <article class="panel">
+              <h3>已选定的机械臂</h3>
+              <p class="desc">标定和遥操作都会用这里选好的设备，不用填端口。</p>
+              <div class="port-list">
+                <div class="role-chip empty" id="chip-follower"><span>从臂（被控制的臂）</span><strong>未选择</strong></div>
+                <div class="role-chip empty" id="chip-leader"><span>主臂（你手里操作的臂）</span><strong>未选择</strong></div>
+              </div>
+            </article>
+            <article class="panel">
+              <h3>标定</h3>
+              <div id="calibrate-summary" hidden>
+                <div class="cam-role-row">
+                  <div class="role-chip" id="calib-sum-follower"><span>从臂</span><strong>已标定</strong></div>
+                  <div class="role-chip" id="calib-sum-leader"><span>主臂</span><strong>已标定</strong></div>
+                </div>
+                <div class="actions" style="margin-top:12px">
+                  <button class="btn secondary" type="button" id="btn-calibrate-again">重新标定</button>
+                </div>
+              </div>
+              <div id="calibrate-body">
+              <p class="desc" id="calibrate-desc">SO-101 共 6 个关节。扫行程时需手动推动 5 个；腕部旋转（wrist_roll）为连续旋转，量程自动 0–4095，界面仍会显示。设备 ID 由串口自动生成，无需手填。从臂完成后会自动切到主臂。</p>
+              <form id="form-calibrate" class="form-grid">
+                <div class="field">
+                  <label>要标定哪条臂</label>
+                  <select name="role" id="calibrate-role">
+                    <option value="follower">从臂</option>
+                    <option value="leader">主臂</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>型号</label>
+                  <select name="type" id="calibrate-type">
+                    <option value="so101_follower">SO-101 从臂</option>
+                    <option value="so101_leader">SO-101 主臂</option>
+                    <option value="so100_follower">SO-100 从臂</option>
+                    <option value="so100_leader">SO-100 主臂</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>设备 ID（自动生成）</label>
+                  <input name="id" id="calibrate-id" readonly tabindex="-1" />
+                  <small id="calibrate-id-hint" style="color:var(--muted);margin-top:4px;display:block">根据已选串口自动命名，例如 follower_USB1081</small>
+                </div>
+                <div class="actions" style="grid-column:1/-1">
+                  <button class="btn" type="submit" id="btn-calibrate">开始标定</button>
+                  <button class="btn secondary" type="button" id="btn-calibrate-refresh">刷新标定状态</button>
+                  <button class="btn danger" type="button" id="btn-calibrate-stop" hidden>停止标定</button>
+                </div>
+              </form>
+
+              <div id="calibrate-guide" class="wizard" hidden style="margin-top:14px">
+                <div class="wizard-steps" id="calibrate-steps"></div>
+                <p class="wizard-hint" id="calibrate-title" style="font-weight:700;margin-bottom:6px"></p>
+                <p class="wizard-hint" id="calibrate-instruction" style="white-space:pre-wrap"></p>
+                <div class="actions" id="calibrate-actions"></div>
+                <div id="calibrate-joints" class="joint-panel" hidden>
+                  <div class="joint-panel-head">
+                    <span>关节 Min / 当前 / Max</span>
+                    <span class="joint-panel-hint" id="calibrate-joints-hint">转动机械臂时数值应实时变化</span>
+                  </div>
+                  <div id="calibrate-joints-table"></div>
+                </div>
+              </div>
+              <pre class="log" id="calibrate-log" style="height:160px;margin-top:12px">标定日志会显示在这里。开始后请按上方引导操作。</pre>
+              </div>
+            </article>
+            <article class="panel" style="grid-column:1/-1">
+              <h3>遥操作试跑</h3>
+              <p class="desc">使用已选定的从臂和主臂，以及上面保存的型号。不写数据集。</p>
+              <form id="form-teleop"></form>
+              <div class="actions">
+                <button class="btn" id="btn-teleop-start" type="button">启动遥操作</button>
+                <button class="btn danger" id="btn-teleop-stop" type="button" hidden>停止</button>
+              </div>
+              <p class="wizard-hint" id="teleop-status" style="margin-top:10px">尚未启动。点「启动遥操作」后，主臂动作会驱动从臂。</p>
+              <pre class="log" id="teleop-log" style="height:140px;margin-top:8px">遥操作日志会显示在这里。</pre>
+            </article>
+          </div>
+
+          <article class="panel" style="margin-top:16px">
+            <h3>摄像头</h3>
+            <p class="desc">选一次主摄像头和腕部后，按系统硬件编号绑定，不按会变的序号。USB 相机序列号唯一时，换口也能认回；两台序列号相同时，绑定各自的 USB 口。iPhone 连续互通相机不会出现在列表里。手机连上或窗口变化后，会按编号重新找到原来的相机。</p>
+            <div class="actions">
+              <button class="btn" id="btn-cameras-refresh" type="button">检测摄像头</button>
+              <button class="btn secondary" id="btn-cameras-reselect" type="button" hidden>重新选择</button>
+            </div>
+            <div class="cam-role-row" style="margin-top:12px">
+              <div class="role-chip empty" id="chip-cam-main"><span>主摄像头</span><strong>未选择</strong></div>
+              <div class="role-chip empty" id="chip-cam-wrist"><span>腕部摄像头</span><strong>未选择</strong></div>
+            </div>
+            <div id="camera-grid" class="camera-grid" style="margin-top:14px">
+              <div class="role-chip empty">尚未检测。请插入摄像头后点「检测摄像头」，并允许浏览器使用相机。</div>
+            </div>
+          </article>
+        </section>
+
         <!-- RECORD -->
         <section class="view" data-view="record">
+          <div class="lock-banner" id="banner-record" hidden></div>
           <article class="panel">
             <h3>录制配置</h3>
-            <p class="desc">对应 <code>lerobot-record</code>。表单参数经 ROS 发给 Python 桥接节点。</p>
+            <p class="desc">任务描述会自动变成数据文件夹。型号、帧率、相机和保存位置在设置里。推动主臂，点「保存本回合」写入这一轮；点「停止并保存」结束。</p>
+            <p class="wizard-hint" id="record-setup-summary">型号和保存位置在设置里。</p>
             <form id="form-record" class="form-grid">
               <div class="field">
-                <label>数据集 repo_id</label>
-                <input name="repoId" value="local/my_pick_task" required />
-              </div>
-              <div class="field">
                 <label>任务描述</label>
-                <input name="singleTask" value="Pick the cube" required />
+                <input name="singleTask" placeholder="例如 Pick the cube" autocomplete="off" />
               </div>
               <div class="field">
                 <label>回合数</label>
-                <input name="numEpisodes" type="number" value="10" min="1" />
-              </div>
-              <div class="field">
-                <label>FPS</label>
-                <input name="fps" type="number" value="30" min="1" />
-              </div>
-              <div class="field">
-                <label>Robot 类型</label>
-                <input name="robotType" value="so101_follower" />
-              </div>
-              <div class="field">
-                <label>Teleop 类型</label>
-                <input name="teleopType" value="so101_leader" />
-              </div>
-              <div class="field">
-                <label>Robot 端口</label>
-                <input name="robotPort" placeholder="/dev/tty…" />
-              </div>
-              <div class="field">
-                <label>Teleop 端口</label>
-                <input name="teleopPort" placeholder="/dev/tty…" />
+                <input name="numEpisodes" type="number" value="10" min="1" max="500" />
               </div>
               <div class="field full">
-                <label>相机 JSON（可选）</label>
-                <textarea name="cameras" rows="3" placeholder='{"front":{"type":"opencv","index_or_path":0,"width":640,"height":480,"fps":30}}'></textarea>
+                <label>使用的设备</label>
+                <div class="role-chip empty" id="record-arms">还没选设备。请先到「设置」用配对向导。</div>
+              </div>
+              <div class="field full">
+                <label>使用的摄像头</label>
+                <div class="role-chip empty" id="record-cams">还没选摄像头。请先到「设置」检测并选定主摄像头 / 腕部摄像头。</div>
               </div>
               <div class="actions" style="grid-column:1/-1">
-                <button class="btn" type="submit">开始录制</button>
-                <button class="btn danger" id="btn-record-stop" type="button">停止录制</button>
+                <button class="btn" type="submit" id="btn-record-start">开始录制</button>
+                <button class="btn" type="button" id="btn-record-next" hidden>保存本回合</button>
+                <button class="btn danger" id="btn-record-stop" type="button" hidden>停止并保存</button>
               </div>
             </form>
+            <p class="wizard-hint" id="record-status" style="margin-top:10px">尚未开始录制。</p>
+            <pre class="log" id="record-log" style="height:160px;margin-top:8px">录制日志会显示在这里。</pre>
+          </article>
+          <article class="panel" style="margin-top:16px">
+            <div class="actions" style="justify-content:space-between;align-items:center">
+              <h3 style="margin:0">本次采集</h3>
+              <button class="btn" type="button" id="btn-save-all-takes">全部保存</button>
+            </div>
+            <p class="desc">录完后默认有一个名称。可以保存、改名或删除。全部保存会把当前列表里还没删掉的采集都标成已保存。有完整回合的记录可以一键重放。</p>
+            <div id="take-list" class="take-list"><div class="role-chip empty">还没有采集记录。</div></div>
+          </article>
+          <article class="panel" style="margin-top:16px">
+            <h3>画面与关节</h3>
+            <p class="desc">录制之前这里显示摄像头和两条臂的关节。点上面的「重放」时，改播这一回合录下来的画面，关节条跟着当时的动作走。开始录制会先放开相机和串口。</p>
+            <div class="actions">
+              <button class="btn danger" type="button" id="btn-replay-stop" hidden>停止重放</button>
+            </div>
+            <p class="wizard-hint" id="joints-status" style="margin-top:8px"></p>
+            <div class="grid cols-2" style="margin-top:14px">
+              <div>
+                <h3 style="margin:0 0 8px">主摄像头</h3>
+                <div class="live-cam-frame" id="live-cam-main-frame">
+                  <img id="live-cam-main" alt="主摄像头" />
+                  <video id="replay-cam-main" playsinline muted hidden></video>
+                  <span class="cam-loading" id="live-cam-main-tip">未开始</span>
+                </div>
+              </div>
+              <div>
+                <h3 style="margin:0 0 8px">腕部摄像头</h3>
+                <div class="live-cam-frame" id="live-cam-wrist-frame">
+                  <img id="live-cam-wrist" alt="腕部摄像头" />
+                  <video id="replay-cam-wrist" playsinline muted hidden></video>
+                  <span class="cam-loading" id="live-cam-wrist-tip">未开始</span>
+                </div>
+              </div>
+            </div>
+            <div class="grid cols-2" style="margin-top:14px">
+              <div>
+                <h3 style="margin:0 0 8px">主臂关节（你在动的）</h3>
+                <div id="joints-leader" class="joint-list"></div>
+              </div>
+              <div>
+                <h3 style="margin:0 0 8px">从臂关节（跟着动的）</h3>
+                <div id="joints-follower" class="joint-list"></div>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <!-- DATASET REPORT -->
+        <section class="view" data-view="report">
+          <article class="panel" id="report-root">
+            <p class="desc">正在评测…</p>
+          </article>
+          <article class="panel" style="margin-top:16px">
+            <h3>每一条数据</h3>
+            <p class="desc">点一条即可拖动进度，同时看两路视频和这一帧的动作。左右两个滑块决定保留的开头和结尾，保存后写回原来的文件。</p>
+            <div id="episode-list" class="take-list"></div>
+            <div id="episode-editor" hidden style="margin-top:16px">
+              <div class="grid cols-2">
+                <div>
+                  <h3 style="margin:0 0 8px">主摄像头</h3>
+                  <div class="live-cam-frame"><video id="ep-video-front" playsinline muted></video></div>
+                </div>
+                <div>
+                  <h3 style="margin:0 0 8px">腕部摄像头</h3>
+                  <div class="live-cam-frame"><video id="ep-video-wrist" playsinline muted></video></div>
+                </div>
+              </div>
+              <label class="desc" for="ep-scrub">进度</label>
+              <input id="ep-scrub" type="range" min="0" max="1" value="0" style="width:100%" />
+              <p class="desc" id="ep-frame-label"></p>
+              <div id="ep-joints" class="joint-list"></div>
+              <label class="desc" for="ep-head">去掉头部，从这一帧开始保留</label>
+              <input id="ep-head" type="range" min="0" max="1" value="0" style="width:100%" />
+              <label class="desc" for="ep-tail">去掉尾部，保留到这一帧</label>
+              <input id="ep-tail" type="range" min="0" max="1" value="1" style="width:100%" />
+              <p class="desc" id="ep-trim-label"></p>
+              <div class="actions">
+                <button class="btn" type="button" id="ep-save">保存并替换原文件</button>
+              </div>
+            </div>
           </article>
         </section>
 
@@ -192,7 +394,7 @@
         <section class="view" data-view="datasets">
           <article class="panel">
             <h3>数据集列表</h3>
-            <p class="desc">通过 ROS 服务查询可用数据集。</p>
+            <p class="desc">本机 <code>~/.cache/huggingface/lerobot</code> 里的采集。空回合是上次停止时没写完的记录，可以删除。</p>
             <table class="table">
               <thead>
                 <tr>
@@ -210,6 +412,7 @@
 
         <!-- TRAIN -->
         <section class="view" data-view="train">
+          <div class="lock-banner" id="banner-train" hidden></div>
           <article class="panel">
             <h3>训练任务</h3>
             <p class="desc">对应 <code>lerobot-train</code>。</p>
@@ -258,6 +461,7 @@
 
         <!-- EVAL -->
         <section class="view" data-view="eval">
+          <div class="lock-banner" id="banner-eval" hidden></div>
           <article class="panel">
             <h3>评估 / Rollout</h3>
             <p class="desc">仿真用 <code>lerobot-eval</code>，真机用 <code>lerobot-rollout</code>。</p>
@@ -290,6 +494,7 @@
 
         <!-- ALIGN -->
         <section class="view" data-view="align">
+          <div class="lock-banner" id="banner-align" hidden></div>
           <article class="panel">
             <h3>数据对齐整理</h3>
             <p class="desc">规划能力：多相机 / 本体感觉时间对齐、丢帧修补、特征校验。接口已预留 ROS 服务。</p>
@@ -319,6 +524,7 @@
 
         <!-- ANNOTATE -->
         <section class="view" data-view="annotate">
+          <div class="lock-banner" id="banner-annotate" hidden></div>
           <article class="panel">
             <h3>智能标注</h3>
             <p class="desc">规划能力：自动任务切分、关键帧检测、语言标注建议。对接未来视觉/语言模型。</p>
@@ -346,27 +552,27 @@
         <section class="view" data-view="pipeline">
           <article class="panel">
             <h3>端到端流水线</h3>
-            <p class="desc">标准实验室路径。每一步都可在左侧导航打开对应界面。</p>
-            <div class="pipeline-flow">
-              <div class="pipeline-node"><strong>硬件</strong><span>端口 · 标定</span></div>
+            <p class="desc">当前能走完的是设置里的硬件准备，然后采集。对齐、标注、训练、评估还没有接到真实程序。</p>
+            <div class="pipeline-flow" id="pipeline-flow">
+              <div class="pipeline-node" data-route="hardware"><strong>硬件</strong><span>端口 · 标定</span></div>
               <div class="pipeline-arrow">→</div>
-              <div class="pipeline-node"><strong>录制</strong><span>遥操作采集</span></div>
+              <div class="pipeline-node" data-route="record"><strong>录制</strong><span>遥操作采集</span></div>
               <div class="pipeline-arrow">→</div>
-              <div class="pipeline-node"><strong>对齐</strong><span>整理校验</span></div>
+              <div class="pipeline-node" data-route="align"><strong>对齐</strong><span>整理校验</span></div>
               <div class="pipeline-arrow">→</div>
-              <div class="pipeline-node"><strong>标注</strong><span>自动识别</span></div>
+              <div class="pipeline-node" data-route="annotate"><strong>标注</strong><span>自动识别</span></div>
               <div class="pipeline-arrow">→</div>
-              <div class="pipeline-node"><strong>训练</strong><span>策略优化</span></div>
+              <div class="pipeline-node" data-route="train"><strong>训练</strong><span>策略优化</span></div>
               <div class="pipeline-arrow">→</div>
-              <div class="pipeline-node"><strong>评估</strong><span>仿真 / 真机</span></div>
+              <div class="pipeline-node" data-route="eval"><strong>评估</strong><span>仿真 / 真机</span></div>
             </div>
           </article>
         </section>
 
-        <!-- shared live panel -->
-        <article class="panel" style="margin-top: 18px">
+        <!-- job panel: only job-related pages -->
+        <article class="panel job-panel" id="job-panel" style="margin-top: 18px" hidden>
           <h3>任务进度与日志</h3>
-          <p class="desc">经 STOMP 订阅 ROS 总线转发的 <code>/topic/jobs</code> 与 <code>/topic/logs</code>。</p>
+          <p class="desc">当前页相关任务的进度与日志。</p>
           <div style="display:flex;justify-content:space-between;align-items:center">
             <span class="badge">progress</span>
             <strong id="job-progress-label">0%</strong>
@@ -378,11 +584,12 @@
     </div>
 
     <div class="toast" id="toast"></div>
+    <div id="reason-tip" role="tooltip"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/ws.js"></script>
-    <script src="/js/app.js"></script>
+    <script src="/js/app.js?v=25"></script>
   </body>
 </html>

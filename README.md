@@ -26,40 +26,44 @@
 | 智能标注 | 自动识别标注 | 界面与服务占位，待深化 |
 | 流水线 | 端到端编排视图 | 可用 |
 
-## 快速启动（无需 ROS）
+## 快速启动
 
-要求：JDK 17+、Maven。
+要求：JDK 17+、Maven、[uv](https://docs.astral.sh/uv/)。
+
+**先装 Python 依赖（含录制所需的 `datasets` 等），再启 Java：**
+
+```bash
+# 在仓库根目录（不是 workbench/）
+uv sync --extra workbench
+# 或
+bash workbench/setup_python.sh
+```
+
+只跑 `uv sync`（不带 extra）**不会**安装 `datasets`，录制会立刻报错。Workbench 启动录制时若检测到缺失，会尝试自动执行 `uv sync --extra workbench`。
+
+**Docker 不是必须。** 本机已有 ROS（例如 Pixi + RoboStack 的 `~/work/dev/ros-learn`）时，一键部署会直接用本机 `pixi run ros2 launch rosbridge…`。
 
 ```bash
 cd workbench
 mvn -q spring-boot:run
 ```
 
-浏览器打开：<http://localhost:8080>
+浏览器打开：<http://localhost:8080> → 左侧 **ROS 环境**。
 
-默认 `lerobot.ros.mock=true`，所有按钮可点击，任务进度会通过 WebSocket 模拟回传。
+启动逻辑：
 
-## 接入真实 ROS（rosbridge）
+1. 探测本机 Pixi ROS 工程（`lerobot.ros.native-pixi-project`，默认 `~/work/dev/ros-learn`）
+2. 若工程可用 → 「一键部署」安装/启动本机 rosbridge（可自动 `pixi add ros-humble-rosbridge-suite`）
+3. 若没有本机 ROS，但有 Docker → 才走 Docker 备选
+4. 都没有 → Mock，并提示配置路径
 
-1. 启动 rosbridge（ROS 2 示例）：
-
-```bash
-ros2 launch rosbridge_server rosbridge_websocket_launch.xml
-```
-
-2. 启动 Python 桥（把 ROS 服务落到 LeRobot CLI）：
+自定义本机 ROS 工程：
 
 ```bash
-# 当前提供 HTTP 形态桥，便于逐步接到 rclpy
-python workbench/bridge/python/lerobot_ros_bridge.py
+LEROBOT_ROS_PIXI=/path/to/your/ros-pixi-project mvn spring-boot:run
 ```
 
-3. 启动 Workbench，关闭 mock：
-
-```bash
-cd workbench
-LEROBOT_ROS_MOCK=false ROSBRIDGE_URL=ws://127.0.0.1:9090 mvn spring-boot:run
-```
+强制 Mock：`LEROBOT_ROS_MOCK=true mvn spring-boot:run`
 
 ## 配置
 

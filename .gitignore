@@ -10,3 +10,6 @@ target/
 .DS_Store
 .env
 *.swp
+__pycache__/
+*.pyc
+.venv/
